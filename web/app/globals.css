@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 197, 94, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(56, 189, 248, 0.06), transparent),
+    #0a0f1e;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-turf-500 px-6 py-3 text-base font-bold text-pitch-950 shadow-lg shadow-turf-500/25 transition-all hover:bg-turf-400 hover:shadow-turf-400/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-pitch-800 px-5 py-2.5 text-sm font-semibold text-slate-200 transition-all hover:border-slate-400 hover:bg-pitch-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-5 py-2.5 text-sm font-semibold text-rose-300 transition-all hover:bg-rose-500/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-700/60 bg-pitch-900/80 shadow-xl backdrop-blur-sm;
+  }
+  .input {
+    @apply w-full rounded-xl border border-slate-600 bg-pitch-800 px-4 py-3 text-base text-slate-100 placeholder-slate-500 outline-none transition-colors focus:border-turf-500 focus:ring-2 focus:ring-turf-500/20;
+  }
+}

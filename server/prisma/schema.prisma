@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A person playing the game. Reused across rooms; identity persists via userId.
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  socketId     String?
+  createdAt    DateTime      @default(now())
+  hostedRooms  Room[]        @relation("RoomHost")
+  participants Participant[]
+}
+
+model Room {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  hostId       String
+  host         User          @relation("RoomHost", fields: [hostId], references: [id])
+  purseSize    Float         @default(100)
+  status       RoomStatus    @default(LOBBY)
+  createdAt    DateTime      @default(now())
+  participants Participant[]
+  players      RoomPlayer[]
+  bids         Bid[]
+  purchases    Purchase[]
+  auctionState AuctionState?
+}
+
+enum RoomStatus {
+  LOBBY
+  AUCTION
+  COMPLETE
+}
+
+// A user's seat in a room. The host also has a seat (isHost) but cannot bid.
+model Participant {
+  id        String      @id @default(cuid())
+  roomId    String
+  room      Room        @relation(fields: [roomId], references: [id])
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  name      String
+  isHost    Boolean     @default(false)
+  purse     Float       @default(100)
+  online      Boolean     @default(true)
+  joinedAt    DateTime    @default(now())
+  squad       Purchase[]
+  bids        Bid[]
+  soldPlayers RoomPlayer[]
+
+  @@unique([roomId, userId])
+}
+
+// Global pool of (fictional) cricket players, seeded once.
+model Player {
+  id          String       @id @default(cuid())
+  name        String
+  role        PlayerRole
+  rating      Int
+  basePrice   Float
+  createdAt   DateTime     @default(now())
+  roomPlayers RoomPlayer[]
+}
+
+enum PlayerRole {
+  WK
+  BAT
+  BOWL
+  AR
+}
+
+// A player assigned to a room's auction pool, with live status.
+model RoomPlayer {
+  id         String       @id @default(cuid())
+  roomId     String
+  room       Room         @relation(fields: [roomId], references: [id])
+  playerId   String
+  player     Player       @relation(fields: [playerId], references: [id])
+  status     PlayerStatus @default(PENDING)
+  soldToId   String?
+  soldTo     Participant? @relation(fields: [soldToId], references: [id])
+  soldFor    Float?
+  order      Int          @default(0)
+  bids       Bid[]
+  purchases  Purchase[]
+
+  @@unique([roomId, playerId])
+}
+
+enum PlayerStatus {
+  PENDING
+  CURRENT
+  SOLD
+  UNSOLD
+}
+
+model Bid {
+  id           String      @id @default(cuid())
+  roomId       String
+  room         Room        @relation(fields: [roomId], references: [id])
+  roomPlayerId String
+  roomPlayer   RoomPlayer @relation(fields: [roomPlayerId], references: [id])
+  bidderId     String
+  bidder       Participant @relation(fields: [bidderId], references: [id])
+  amount       Float
+  createdAt    DateTime    @default(now())
+}
+
+// Immutable record of a sold player. Drives the final results screen.
+model Purchase {
+  id           String      @id @default(cuid())
+  roomId       String
+  room         Room        @relation(fields: [roomId], references: [id])
+  roomPlayerId String
+  roomPlayer   RoomPlayer @relation(fields: [roomPlayerId], references: [id])
+  bidderId     String
+  bidder       Participant @relation(fields: [bidderId], references: [id])
+  amount       Float
+  createdAt    DateTime    @default(now())
+}
+
+// Persisted live auction state so a server restart / browser refresh
+// never destroys a room. The in-memory engine mirrors this table.
+model AuctionState {
+  id                  String       @id @default(cuid())
+  roomId              String       @unique
+  room                Room         @relation(fields: [roomId], references: [id])
+  currentRoomPlayerId String?
+  currentBid          Float?
+  currentBidderId      String?
+  phase               AuctionPhase @default(IDLE)
+  countdownEndsAt     DateTime?
+  paused              Boolean      @default(false)
+  updatedAt           DateTime     @updatedAt
+}
+
+enum AuctionPhase {
+  IDLE
+  BIDDING
+  COUNTDOWN
+  SOLD_PENDING
+  UNSOLD_PENDING
+  WAITING_FOR_HOST
+  COMPLETE
+}
