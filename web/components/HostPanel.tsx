@@ -44,14 +44,22 @@ export default function HostPanel({ snapshot }: { snapshot: RoomSnapshot }) {
             </button>
           )}
 
-          {/* Next Player (shown when waiting for host) */}
+          {/* Next player selection is available only after settlement. */}
           {isWaitingForHost && (
-            <button
-              className="btn-primary col-span-2 py-3 text-base animate-pulse"
-              onClick={() => emit('auction:nextPlayer')}
-            >
-              ⏭ Next Player
-            </button>
+            <>
+              <button
+                className="btn-primary col-span-2 py-3 text-base animate-pulse"
+                onClick={() => emit('auction:bringNextPlayer')}
+              >
+                ⏭ Bring Up Next Player
+              </button>
+              <button
+                className="btn-secondary col-span-2 py-3 text-base"
+                onClick={() => setShowPicker(true)}
+              >
+                📋 Choose From Player List
+              </button>
+            </>
           )}
 
           {/* Every player now enters the closing countdown automatically. */}
@@ -100,6 +108,20 @@ export default function HostPanel({ snapshot }: { snapshot: RoomSnapshot }) {
       </div>
 
       {/* Player picker */}
+      {isWaitingForHost && (
+        <div className="card border border-turf-500/30 bg-turf-500/5 p-5 text-center">
+          <p className="text-sm font-bold text-slate-100">Choose the next auction player</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {snapshot.auction.pendingPlayers.length} players remain in the pool
+          </p>
+          <button
+            className="btn-primary mt-4 w-full py-3 text-base"
+            onClick={() => emit('auction:randomPlayer')}
+          >
+            🎲 Select Random Player
+          </button>
+        </div>
+      )}
       {showPicker && <PlayerPicker snapshot={snapshot} />}
 
       {/* Participant overview */}
@@ -136,11 +158,7 @@ export default function HostPanel({ snapshot }: { snapshot: RoomSnapshot }) {
 function PlayerPicker({ snapshot }: { snapshot: RoomSnapshot }) {
   const [pending, setPending] = useState<string[]>([])
 
-  // Derive pending players: not sold and not current.
-  const soldIds = new Set(snapshot.auction.soldPlayers.map((p) => p.id))
-  const currentId = snapshot.auction.currentPlayer?.id
-  const available = snapshot.auction.soldPlayers
-    .filter((p) => !soldIds.has(p.id) && p.id !== currentId)
+  const available = snapshot.auction.pendingPlayers
     .sort((a, b) => b.rating - a.rating)
 
   const select = (roomPlayerId: string) => {

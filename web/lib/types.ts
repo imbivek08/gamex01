@@ -49,6 +49,7 @@ export interface PublicCurrentBid {
 export interface AuctionSnapshot {
   phase: AuctionPhase
   currentPlayer: PublicRoomPlayer | null
+  pendingPlayers: PublicRoomPlayer[]
   currentBid: PublicCurrentBid | null
   countdownEndsAt: number | null
   paused: boolean

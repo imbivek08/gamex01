@@ -49,7 +49,13 @@ export default function RoomPage() {
 
     const onState = (state: RoomSnapshot) => {
       if (cancelled) return
-      setSnapshot(state)
+      // Room-wide engine broadcasts do not include recipient-specific identity.
+      // Keep the identity established during room join so host controls remain
+      // available after auction state transitions.
+      setSnapshot((previous) => ({
+        ...state,
+        you: state.you ?? previous?.you ?? null,
+      }))
       setJoining(false)
       setJoinError('')
     }

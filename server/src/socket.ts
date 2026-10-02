@@ -10,7 +10,26 @@ interface JoinPayload {
 }
 
 export function registerSocketHandlers(io: Server) {
-  const manager = new AuctionManager(io)
+  let manager: AuctionManager
+
+  const broadcastState = async (roomId: string) => {
+    const engine = manager.getEngine(roomId)
+    if (!engine) return
+    const sockets = await io.in(roomId).fetchSockets()
+    for (const s of sockets) {
+      const participantId = (s.data as { participantId?: string }).participantId ?? null
+      const snapshot: RoomSnapshot = await engine.getSnapshot()
+      snapshot.you = participantId
+        ? {
+            participantId,
+            isHost: snapshot.participants.find((p) => p.id === participantId)?.isHost ?? false,
+          }
+        : null
+      s.emit('room:state', snapshot)
+    }
+  }
+
+  manager = new AuctionManager(io, broadcastState)
 
   // Recover any auctions that were live before a server restart.
   manager.recoverAll().catch((e) => console.error('Failed to recover auctions:', e))
@@ -42,32 +61,6 @@ export function registerSocketHandlers(io: Server) {
           }
         : null
       socket.emit('room:state', snapshot)
-    }
-
-    /**
-     * Broadcast a personalized snapshot to every socket in the room.
-     * Each recipient gets their own `you` field.
-     */
-    const broadcastState = async (roomId: string) => {
-      const engine = manager.getEngine(roomId)
-      if (!engine) {
-        console.log(`[broadcast] No engine for room ${roomId}`)
-        return
-      }
-      const sockets = await io.in(roomId).fetchSockets()
-      console.log(`[broadcast] Room ${roomId}: ${sockets.length} socket(s) in room`)
-      for (const s of sockets) {
-        const participantId = (s.data as { participantId?: string }).participantId ?? null
-        const snapshot: RoomSnapshot = await engine.getSnapshot()
-        snapshot.you = participantId
-          ? {
-              participantId,
-              isHost: snapshot.participants.find((p) => p.id === participantId)?.isHost ?? false,
-            }
-          : null
-        console.log(`[broadcast] Sending state to socket ${s.id}, participantId=${participantId}, isHost=${snapshot.you?.isHost}, participants=${snapshot.participants.length}`)
-        s.emit('room:state', snapshot)
-      }
     }
 
     const handleError = (cb: unknown, message: string) => {
@@ -240,6 +233,8 @@ export function registerSocketHandlers(io: Server) {
     socket.on('auction:startCountdown', hostHandler((e) => e.startCountdown()))
     socket.on('auction:skipPlayer', hostHandler((e) => e.skipPlayer()))
     socket.on('auction:nextPlayer', hostHandler((e) => e.nextPlayer()))
+    socket.on('auction:bringNextPlayer', hostHandler((e) => e.nextPlayer()))
+    socket.on('auction:randomPlayer', hostHandler((e) => e.selectRandomPlayer()))
     socket.on('auction:selectPlayer', (payload: { roomPlayerId: string }, cb: unknown) => {
       hostHandler((e) => e.selectPlayer(payload.roomPlayerId))({}, cb)
     })

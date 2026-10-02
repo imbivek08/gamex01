@@ -61,6 +61,7 @@ export class AuctionEngine {
   constructor(
     private readonly io: Server,
     private readonly roomId: string,
+    private readonly broadcastRoom?: () => Promise<void>,
   ) {}
 
   // ---------- persistence ----------
@@ -93,14 +94,18 @@ export class AuctionEngine {
   }
 
   /** Rebuild in-memory state from the database (used on server boot). */
-  static async recover(io: Server, roomId: string): Promise<AuctionEngine | null> {
+  static async recover(
+    io: Server,
+    roomId: string,
+    broadcastRoom?: () => Promise<void>,
+  ): Promise<AuctionEngine | null> {
     const room = await prisma.room.findUnique({
       where: { id: roomId },
       include: { auctionState: true },
     })
     if (!room || !room.auctionState) return null
 
-    const engine = new AuctionEngine(io, roomId)
+    const engine = new AuctionEngine(io, roomId, broadcastRoom)
     const s = room.auctionState
     engine.state.phase = s.phase
     engine.state.currentRoomPlayerId = s.currentRoomPlayerId
@@ -119,6 +124,10 @@ export class AuctionEngine {
   // ---------- broadcasting ----------
 
   private async broadcast() {
+    if (this.broadcastRoom) {
+      await this.broadcastRoom()
+      return
+    }
     const snapshot = await this.getSnapshot()
     this.io.to(this.roomId).emit('room:state', snapshot)
   }
@@ -194,6 +203,9 @@ export class AuctionEngine {
     const soldPlayers = room.players
       .filter((rp) => rp.status === 'SOLD')
       .map(toPublicRoomPlayer)
+    const pendingPlayers = room.players
+      .filter((rp) => rp.status === 'PENDING')
+      .map(toPublicRoomPlayer)
 
     const currentBid: PublicCurrentBid | null = this.state.currentBid !== null
       ? {
@@ -207,6 +219,7 @@ export class AuctionEngine {
     const auction: AuctionSnapshot = {
       phase: this.state.phase,
       currentPlayer: currentRoomPlayer ? toPublicRoomPlayer(currentRoomPlayer) : null,
+      pendingPlayers,
       currentBid,
       countdownEndsAt: this.state.countdownEndsAt,
       paused: this.state.paused,
@@ -341,7 +354,7 @@ export class AuctionEngine {
       data: { status: 'UNSOLD' },
     })
     this.notify('unsold', 'Player skipped by host')
-    await this.advanceToNextPlayer()
+    await this.waitForHostToSelectNext()
     await this.broadcast()
   }
 
@@ -352,8 +365,8 @@ export class AuctionEngine {
     })
     if (!rp) throw new Error('Player not found in this room')
     if (rp.status !== 'PENDING') throw new Error('Player is not available')
-    if (this.state.phase !== 'BIDDING') {
-      throw new Error('Confirm the current player first')
+    if (this.state.phase !== 'WAITING_FOR_HOST') {
+      throw new Error('Wait for the current player to be settled first')
     }
     await this.clearCountdown()
     if (this.state.currentRoomPlayerId) {
@@ -373,6 +386,21 @@ export class AuctionEngine {
     await this.persistState()
     this.notify('info', 'Host selected a new player')
     await this.broadcast()
+  }
+
+  async selectRandomPlayer(): Promise<void> {
+    if (this.state.phase !== 'WAITING_FOR_HOST') {
+      throw new Error('Wait for the current player to be settled first')
+    }
+    const pending = await prisma.roomPlayer.findMany({
+      where: { roomId: this.roomId, status: 'PENDING' },
+      select: { id: true },
+    })
+    if (pending.length === 0) {
+      throw new Error('No players remain in the auction pool')
+    }
+    const selected = pending[Math.floor(Math.random() * pending.length)]
+    await this.selectPlayer(selected.id)
   }
 
   async confirmSold(): Promise<void> {
@@ -410,7 +438,7 @@ export class AuctionEngine {
     const bidder = await prisma.participant.findUniqueOrThrow({ where: { id: bidderId } })
     this.notify('sold', `${player.player.name} SOLD to ${bidder.name} for ₹${amount.toFixed(1)} Cr!`)
 
-    await this.advanceToNextPlayer()
+    await this.waitForHostToSelectNext()
     await this.broadcast()
   }
 
@@ -429,7 +457,7 @@ export class AuctionEngine {
       include: { player: true },
     })
     this.notify('unsold', `${player.player.name} went UNSOLD`)
-    await this.advanceToNextPlayer()
+    await this.waitForHostToSelectNext()
     await this.broadcast()
   }
 
@@ -549,6 +577,29 @@ export class AuctionEngine {
     await this.broadcast()
   }
 
+  private async waitForHostToSelectNext() {
+    await this.clearCountdown()
+    const remaining = await prisma.roomPlayer.count({
+      where: { roomId: this.roomId, status: 'PENDING' },
+    })
+    if (remaining === 0) {
+      this.state.phase = 'COMPLETE'
+      this.state.currentRoomPlayerId = null
+      this.state.currentBid = null
+      this.state.currentBidderId = null
+      await prisma.room.update({ where: { id: this.roomId }, data: { status: 'COMPLETE' } })
+      await this.persistState()
+      this.notify('complete', 'Auction complete! Check the final results.')
+      return
+    }
+    this.state.currentRoomPlayerId = null
+    this.state.currentBid = null
+    this.state.currentBidderId = null
+    this.state.phase = 'WAITING_FOR_HOST'
+    this.state.paused = false
+    await this.persistState()
+  }
+
   /** Move to the next pending player, or finish the auction. */
   private async advanceToNextPlayer() {
     const next = await prisma.roomPlayer.findFirst({
@@ -582,16 +633,27 @@ export class AuctionEngine {
 export class AuctionManager {
   private engines = new Map<string, AuctionEngine>()
 
-  constructor(private readonly io: Server) {}
+  constructor(
+    private readonly io: Server,
+    private readonly broadcastRoom?: (roomId: string) => Promise<void>,
+  ) {}
 
   async registerRoom(roomId: string) {
     if (this.engines.has(roomId)) return this.engines.get(roomId)!
-    const engine = await AuctionEngine.recover(this.io, roomId)
+    const engine = await AuctionEngine.recover(
+      this.io,
+      roomId,
+      this.broadcastRoom ? () => this.broadcastRoom!(roomId) : undefined,
+    )
     if (engine) {
       this.engines.set(roomId, engine)
       return engine
     }
-    const fresh = new AuctionEngine(this.io, roomId)
+    const fresh = new AuctionEngine(
+      this.io,
+      roomId,
+      this.broadcastRoom ? () => this.broadcastRoom!(roomId) : undefined,
+    )
     this.engines.set(roomId, fresh)
     return fresh
   }

@@ -154,15 +154,12 @@ async function main() {
 
   const pendingState = await waitFor(hostState, (s) => s.auction.phase === 'SOLD_PENDING', 'SOLD_PENDING')
   assert(pendingState.auction.currentBid.amount === basePrice + 2, 'highest bid carried into SOLD_PENDING')
+  assert(pendingState.you?.isHost === true, 'host identity preserved after countdown')
 
   // --- Confirm sold ---
   console.log('\n6. Confirm SOLD')
   await emitAck(host, 'auction:confirmSold')
-  const soldState = await waitFor(
-    hostState,
-    (s) => s.auction.phase === 'COUNTDOWN' && s.auction.currentPlayer?.id !== firstPlayer.id,
-    'next player after sold',
-  )
+  const soldState = await waitFor(hostState, (s) => s.auction.phase === 'WAITING_FOR_HOST', 'host next-player choice')
   assert(soldState.auction.soldPlayers.length === 1, 'player marked as sold')
   assert(soldState.auction.soldPlayers[0].soldToName === 'BidderC', 'sold to BidderC')
   const bidderC = soldState.participants.find((p: any) => p.name === 'BidderC')
@@ -170,31 +167,28 @@ async function main() {
 
   // --- Skip player ---
   console.log('\n7. Skip player')
-  const skipState = await waitFor(hostState, (s) => s.auction.currentPlayer !== null, 'player up for skip')
+  await emitAck(host, 'auction:randomPlayer')
+  const skipState = await waitFor(hostState, (s) => s.auction.currentPlayer !== null, 'random player selected')
   const skippedPlayer = skipState.auction.currentPlayer
   await emitAck(host, 'auction:skipPlayer')
-  const afterSkip = await waitFor(
-    hostState,
-    (s) => s.auction.currentPlayer?.id !== skippedPlayer.id,
-    'player after skip',
-  )
+  const afterSkip = await waitFor(hostState, (s) => s.auction.phase === 'WAITING_FOR_HOST', 'host next-player choice after skip')
   assert(afterSkip.auction.soldPlayers.length === 1, 'skipped player not in sold list')
 
   // --- Unsold flow ---
   console.log('\n8. Unsold flow')
-  const unsoldPlayer = afterSkip.auction.currentPlayer
+  await emitAck(host, 'auction:bringNextPlayer')
+  const unsoldPlayerState = await waitFor(hostState, (s) => s.auction.currentPlayer !== null, 'next player selected')
+  const unsoldPlayer = unsoldPlayerState.auction.currentPlayer
   const unsoldPending = await waitFor(hostState, (s) => s.auction.phase === 'UNSOLD_PENDING', 'UNSOLD_PENDING')
   assert(unsoldPending.auction.currentPlayer.id === unsoldPlayer.id, 'UNSOLD_PENDING for player with no bids')
   await emitAck(host, 'auction:confirmUnsold')
-  const afterUnsold = await waitFor(
-    hostState,
-    (s) => s.auction.currentPlayer?.id !== unsoldPlayer.id,
-    'player after unsold',
-  )
+  const afterUnsold = await waitFor(hostState, (s) => s.auction.phase === 'WAITING_FOR_HOST', 'host next-player choice after unsold')
   assert(afterUnsold.auction.soldPlayers.length === 1, 'unsold player not added to sold list')
 
   // --- Pause/resume ---
   console.log('\n9. Pause / resume')
+  await emitAck(host, 'auction:nextPlayer')
+  await waitFor(hostState, (s) => s.auction.currentPlayer !== null, 'player for pause test')
   await emitAck(host, 'auction:pause')
   await waitFor(hostState, (s) => s.auction.paused === true, 'paused')
   const pausedBid = await emitAck(bidders[0], 'bid:place', { amount: 50 })

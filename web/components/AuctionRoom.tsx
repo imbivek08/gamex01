@@ -27,7 +27,7 @@ export default function AuctionRoom({ snapshot, isHost }: { snapshot: RoomSnapsh
               {auction.phase === 'COUNTDOWN' && 'Going once…'}
               {auction.phase === 'SOLD_PENDING' && 'Sale ready to confirm'}
               {auction.phase === 'UNSOLD_PENDING' && 'Unsold ready to confirm'}
-              {auction.phase === 'WAITING_FOR_HOST' && 'Waiting for host to bring next player…'}
+              {auction.phase === 'WAITING_FOR_HOST' && 'Host must bring up the next player'}
               {auction.paused && <span className="ml-2 text-amber-400">· Paused</span>}
             </p>
             <p className="text-xs text-slate-500">
@@ -118,4 +118,3 @@ export default function AuctionRoom({ snapshot, isHost }: { snapshot: RoomSnapsh
     </div>
   )
 }
-
