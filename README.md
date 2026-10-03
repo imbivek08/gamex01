@@ -58,6 +58,13 @@ Copy `.env.example` to `server/.env` and `web/.env.local`:
 | `CLIENT_ORIGIN` | `server/.env` | `http://localhost:3000` | Allowed browser origin (CORS) |
 | `NEXT_PUBLIC_SERVER_URL` | `web/.env.local` | `http://localhost:4000` | Socket.IO server URL (browser) |
 
+## Continuous Integration
+
+GitHub Actions runs on every push and pull request. The workflow starts PostgreSQL,
+applies Prisma migrations, seeds the player pool, validates the Prisma schema,
+builds both workspaces, starts the realtime server, and runs the multiplayer
+auction end-to-end test.
+
 ---
 
 ## Database Commands

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate, build, and test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: auction
+          POSTGRES_PASSWORD: auction
+          POSTGRES_DB: cricket_auction
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U auction -d cricket_auction"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://auction:auction@localhost:5432/cricket_auction?schema=public
+      PORT: 4000
+      CLIENT_ORIGIN: http://localhost:3000
+      TEST_URL: http://localhost:4000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace server
+
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema server/prisma/schema.prisma
+
+      - name: Apply migrations and seed test data
+        run: npm run db:setup --workspace server
+
+      - name: Build server and web
+        run: npm run build
+
+      - name: Start server
+        run: |
+          npm run start --workspace server > /tmp/cricket-auction-server.log 2>&1 &
+          echo $! > /tmp/cricket-auction-server.pid
+
+      - name: Wait for server health
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent "$TEST_URL/health" > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/cricket-auction-server.log
+          exit 1
+
+      - name: Run auction end-to-end test
+        run: npm run test:e2e --workspace server
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/cricket-auction-server.pid ]; then
+            kill "$(cat /tmp/cricket-auction-server.pid)" || true
+          fi
