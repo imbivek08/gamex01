@@ -19,6 +19,7 @@ export interface PublicRoomPlayer {
   basePrice: number
   status: 'PENDING' | 'CURRENT' | 'SOLD' | 'UNSOLD'
   soldFor: number | null
+  soldToId: string | null
   soldToName: string | null
 }
 

@@ -163,6 +163,8 @@ async function main() {
   assert(soldState.auction.soldPlayers.length === 1, 'player marked as sold')
   assert(soldState.auction.soldPlayers[0].soldToName === 'BidderC', 'sold to BidderC')
   const bidderC = soldState.participants.find((p: any) => p.name === 'BidderC')
+  assert(soldState.auction.soldPlayers[0].soldToId === bidderC.id, 'sold buyer id is exposed')
+  assert(bidderC.squadCount === 1, 'sold player added to buyer squad')
   assert(Math.abs(bidderC.purse - (100 - (basePrice + 2))) < 0.01, `BidderC purse debited (₹${bidderC.purse} Cr left)`)
 
   // --- Skip player ---

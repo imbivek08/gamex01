@@ -178,6 +178,7 @@ export class AuctionEngine {
       basePrice: rp.player.basePrice,
       status: rp.status,
       soldFor: rp.soldFor,
+      soldToId: rp.soldToId,
       soldToName: rp.soldTo?.name ?? null,
     })
 

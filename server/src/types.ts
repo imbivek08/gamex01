@@ -25,6 +25,7 @@ export interface PublicRoomPlayer extends PublicPlayer {
   id: string // RoomPlayer id
   status: 'PENDING' | 'CURRENT' | 'SOLD' | 'UNSOLD'
   soldFor: number | null
+  soldToId: string | null
   soldToName: string | null
 }
 

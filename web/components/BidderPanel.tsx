@@ -126,7 +126,34 @@ export default function BidderPanel({ snapshot }: { snapshot: RoomSnapshot }) {
         <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
           Your Squad ({squad?.squadCount ?? 0} players)
         </h3>
+        <ActiveBid snapshot={snapshot} />
         <SquadList snapshot={snapshot} />
+      </div>
+    </div>
+  )
+}
+
+function ActiveBid({ snapshot }: { snapshot: RoomSnapshot }) {
+  const youId = snapshot.you?.participantId
+  const { currentPlayer, currentBid } = snapshot.auction
+
+  if (!currentPlayer || !currentBid || currentBid.bidderId !== youId) {
+    return null
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-turf-500/30 bg-turf-500/5 px-3 py-2.5">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-turf-300">
+          Winning bid · pending sale
+        </span>
+        <span className="font-bold tabular-nums text-amber-400">{formatCr(currentBid.amount)}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${roleColor(currentPlayer.role)}`}>
+          {currentPlayer.role}
+        </span>
+        <span className="font-medium text-slate-200">{currentPlayer.name}</span>
       </div>
     </div>
   )
@@ -134,10 +161,8 @@ export default function BidderPanel({ snapshot }: { snapshot: RoomSnapshot }) {
 
 function SquadList({ snapshot }: { snapshot: RoomSnapshot }) {
   const youId = snapshot.you?.participantId
-  // We don't have per-player squad detail in the snapshot for the bidder's own squad
-  // beyond squadCount; derive sold players for this bidder from soldPlayers.
   const myPlayers = snapshot.auction.soldPlayers.filter(
-    (p) => p.soldToName === snapshot.participants.find((x) => x.id === youId)?.name,
+    (p) => p.soldToId === youId,
   )
 
   if (myPlayers.length === 0) {
