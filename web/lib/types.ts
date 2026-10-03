@@ -17,6 +17,16 @@ export interface PublicRoomPlayer {
   role: Role
   rating: number
   basePrice: number
+  nationality: string | null
+  age: number | null
+  battingStyle: string | null
+  bowlingStyle: string | null
+  matchesPlayed: number | null
+  runs: number | null
+  wickets: number | null
+  strikeRate: number | null
+  economyRate: number | null
+  bio: string | null
   status: 'PENDING' | 'CURRENT' | 'SOLD' | 'UNSOLD'
   soldFor: number | null
   soldToId: string | null

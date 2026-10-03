@@ -1,0 +1,11 @@
+ALTER TABLE "Player"
+ADD COLUMN "nationality" TEXT,
+ADD COLUMN "age" INTEGER,
+ADD COLUMN "battingStyle" TEXT,
+ADD COLUMN "bowlingStyle" TEXT,
+ADD COLUMN "matchesPlayed" INTEGER,
+ADD COLUMN "runs" INTEGER,
+ADD COLUMN "wickets" INTEGER,
+ADD COLUMN "strikeRate" DOUBLE PRECISION,
+ADD COLUMN "economyRate" DOUBLE PRECISION,
+ADD COLUMN "bio" TEXT;

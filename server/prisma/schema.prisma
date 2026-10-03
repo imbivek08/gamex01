@@ -60,13 +60,23 @@ model Participant {
 
 // Global pool of (fictional) cricket players, seeded once.
 model Player {
-  id          String       @id @default(cuid())
-  name        String
-  role        PlayerRole
-  rating      Int
-  basePrice   Float
-  createdAt   DateTime     @default(now())
-  roomPlayers RoomPlayer[]
+  id            String       @id @default(cuid())
+  name          String
+  role          PlayerRole
+  rating        Int
+  basePrice     Float
+  nationality   String?
+  age           Int?
+  battingStyle  String?
+  bowlingStyle  String?
+  matchesPlayed Int?
+  runs          Int?
+  wickets       Int?
+  strikeRate    Float?
+  economyRate   Float?
+  bio           String?
+  createdAt     DateTime     @default(now())
+  roomPlayers   RoomPlayer[]
 }
 
 enum PlayerRole {

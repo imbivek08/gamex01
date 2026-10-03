@@ -7,6 +7,8 @@ import { getSocket } from '@/lib/socket'
 export default function Lobby({ snapshot, isHost }: { snapshot: RoomSnapshot; isHost: boolean }) {
   const [starting, setStarting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [shared, setShared] = useState(false)
+  const [shareError, setShareError] = useState('')
 
   const copyCode = async () => {
     try {
@@ -15,6 +17,28 @@ export default function Lobby({ snapshot, isHost }: { snapshot: RoomSnapshot; is
       setTimeout(() => setCopied(false), 1500)
     } catch {
       // clipboard unavailable — select fallback
+    }
+  }
+
+  const shareInviteLink = async () => {
+    setShareError('')
+    const inviteLink = `${window.location.origin}/room/${snapshot.room.code}`
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${snapshot.room.name} — Cricket Auction`,
+          text: 'Join my cricket auction room!',
+          url: inviteLink,
+        })
+      } else {
+        await navigator.clipboard.writeText(inviteLink)
+      }
+      setShared(true)
+      setTimeout(() => setShared(false), 2000)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setShareError('Could not share the invite link. Please copy the room code instead.')
     }
   }
 
@@ -46,6 +70,20 @@ export default function Lobby({ snapshot, isHost }: { snapshot: RoomSnapshot; is
         <p className="mt-2 text-xs text-slate-500">
           {copied ? 'Copied!' : 'Tap to copy'} · Purse ₹{snapshot.room.purseSize} Cr per player
         </p>
+        {isHost && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={shareInviteLink}
+              className="btn-primary w-full"
+            >
+              {shared ? '✓ Invite Link Ready' : '🔗 Share Invite Link'}
+            </button>
+            <p className="mt-2 min-h-4 text-xs text-slate-500">
+              {shareError || (shared ? 'Link copied — send it to your friends.' : 'Friends can open the link to join directly.')}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Participants */}

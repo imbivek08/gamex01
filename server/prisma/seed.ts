@@ -2,9 +2,16 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+type Role = 'WK' | 'BAT' | 'BOWL' | 'AR'
+
+interface PlayerSeed {
+  name: string
+  role: Role
+  rating: number
+}
+
 // Fictional players only — no real IPL/player branding.
-// [name, role, rating]
-const PLAYERS: Array<[string, 'WK' | 'BAT' | 'BOWL' | 'AR', number]> = [
+const BASE_PLAYERS: Array<[string, Role, number]> = [
   // Elite tier (90+)
   ['Arjun Mehta', 'BAT', 96],
   ['Kabir Singh Rathore', 'BAT', 94],
@@ -77,31 +84,81 @@ function basePriceFor(rating: number, index: number): number {
   return Math.max(0.5, Math.min(20, price))
 }
 
-async function main() {
-  console.log('Seeding fictional cricket players...')
+const generatedFirstNames = [
+  'Aarav', 'Vihaan', 'Reyansh', 'Atharv', 'Dhruv', 'Kabir', 'Ayaan',
+  'Vivaan', 'Rudra', 'Kiaan', 'Neil', 'Arnav', 'Yuvan', 'Shaurya',
+  'Samar',
+]
+const generatedLastNames = ['Bedi', 'Chauhan', 'Dutta', 'Goswami', 'Kapoor', 'Luthra', 'Sethi']
 
-  const existing = await prisma.player.count()
-  if (existing > 0) {
-    console.log(`Player pool already has ${existing} players — skipping.`)
-    return
+const GENERATED_PLAYERS: PlayerSeed[] = generatedFirstNames.flatMap((firstName, firstIndex) =>
+  generatedLastNames.map((lastName, lastIndex) => {
+    const index = firstIndex * generatedLastNames.length + lastIndex
+    const role: Role = (['BAT', 'BOWL', 'AR', 'WK'] as Role[])[index % 4]
+    return {
+      name: `${firstName} ${lastName}`,
+      role,
+      rating: 67 + ((index * 7) % 29),
+    }
+  }),
+)
+
+const PLAYERS: PlayerSeed[] = [
+  ...BASE_PLAYERS.map(([name, role, rating]) => ({ name, role, rating })),
+  ...GENERATED_PLAYERS,
+].slice(0, 150)
+
+function profileFor(player: PlayerSeed, index: number) {
+  const batting = player.role === 'BOWL' ? 'Right-hand bat' : index % 3 === 0 ? 'Left-hand bat' : 'Right-hand bat'
+  const bowling =
+    player.role === 'BAT' || player.role === 'WK'
+      ? 'Occasional medium pace'
+      : player.role === 'AR'
+        ? index % 2 === 0
+          ? 'Right-arm medium'
+          : 'Left-arm orthodox'
+        : index % 2 === 0
+          ? 'Right-arm fast'
+          : 'Right-arm leg spin'
+  const matchesPlayed = 24 + ((index * 17) % 132)
+  const runs = player.role === 'BOWL' ? 180 + ((index * 83) % 1450) : 650 + ((index * 197) % 7200)
+  const wickets = player.role === 'BAT' || player.role === 'WK' ? 2 + ((index * 3) % 38) : 18 + ((index * 11) % 132)
+
+  return {
+    nationality: 'India',
+    age: 20 + ((index * 5) % 17),
+    battingStyle: batting,
+    bowlingStyle: bowling,
+    matchesPlayed,
+    runs,
+    wickets,
+    strikeRate: Math.round((108 + ((index * 13) % 61) + (player.rating - 70) * 0.3) * 10) / 10,
+    economyRate: Math.round((6.2 + ((index * 7) % 34) / 10) * 10) / 10,
+    bio: `${player.name} is a ${player.role === 'AR' ? 'versatile all-rounder' : player.role === 'WK' ? 'reliable wicketkeeper-batter' : player.role === 'BAT' ? 'composed top-order batter' : 'disciplined bowling specialist'} known for consistent performances.`,
   }
-
-  for (let i = 0; i < PLAYERS.length; i++) {
-    const [name, role, rating] = PLAYERS[i]
-    await prisma.player.create({
-      data: {
-        name,
-        role,
-        rating,
-        basePrice: basePriceFor(rating, i),
-      },
-    })
-  }
-
-  console.log(`Seeded ${PLAYERS.length} players.`)
 }
 
-main()
+async function seedPlayers() {
+  for (let i = 0; i < PLAYERS.length; i++) {
+    const player = PLAYERS[i]
+    const profile = profileFor(player, i)
+    const existing = await prisma.player.findFirst({ where: { name: player.name } })
+    if (existing) {
+      await prisma.player.update({
+        where: { id: existing.id },
+        data: { ...player, basePrice: basePriceFor(player.rating, i), ...profile },
+      })
+    } else {
+      await prisma.player.create({
+        data: { ...player, basePrice: basePriceFor(player.rating, i), ...profile },
+      })
+    }
+  }
+
+  console.log(`Seeded or updated ${PLAYERS.length} players.`)
+}
+
+seedPlayers()
   .catch((e) => {
     console.error(e)
     process.exit(1)

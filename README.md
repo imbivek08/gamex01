@@ -14,7 +14,7 @@ Built with **Next.js + TypeScript + Tailwind CSS** (frontend), **Express + Socke
 - **Countdown timer** with animated ring, bid history, and toast notifications
 - **Persistent state** — refresh the browser or restart the server and the room survives
 - **Final results screen** with every squad, spending, and remaining purse
-- **51 fictional players** across WK / BAT / BOWL / AR with ratings and base prices
+- **150 fictional players** across WK / BAT / BOWL / AR with profiles, ratings, stats, and base prices
 
 ---
 
@@ -38,7 +38,7 @@ npm run dev
 
 Then open **http://localhost:3000** in multiple browser tabs:
 
-1. Tab 1: **Create Room** → enter your name → note the 4-character code
+1. Tab 1: **Create Room** → enter your name → click **Share Invite Link** and send the generated link to your friends
 2. Tabs 2–4: **Join Room** → enter the code + your names
 3. Tab 1 (host): **Start the Auction**
 4. Bidders: place bids with the quick-raise buttons or a custom amount
@@ -67,7 +67,7 @@ npm run db:up          # Start PostgreSQL container (port 5434)
 npm run db:down        # Stop PostgreSQL container
 npm run db:migrate     # Create a new migration (prisma migrate dev)
 npm run db:setup       # Apply migrations + seed players (prisma migrate deploy && prisma db seed)
-npm run db:seed        # Seed the 51 fictional players only
+npm run db:seed        # Seed or update the 150 fictional player profiles
 ```
 
 ---
@@ -123,7 +123,7 @@ The `AuctionState` table stores the live phase, current player, current bid, and
 ├── server/                 # Express + Socket.IO + Prisma
 │   ├── prisma/
 │   │   ├── schema.prisma   # Data model
-│   │   └── seed.ts         # 51 fictional players
+│   │   └── seed.ts         # 150 fictional players and profile stats
 │   └── src/
 │       ├── index.ts        # HTTP + Socket.IO bootstrap
 │       ├── engine.ts       # Server-authoritative auction engine
