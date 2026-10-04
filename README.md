@@ -60,10 +60,18 @@ Copy `.env.example` to `server/.env` and `web/.env.local`:
 
 ## Continuous Integration
 
-GitHub Actions runs on every push and pull request. The workflow starts PostgreSQL,
+The CI workflow runs on every push to any branch. It starts PostgreSQL,
 applies Prisma migrations, seeds the player pool, validates the Prisma schema,
 builds both workspaces, starts the realtime server, and runs the multiplayer
 auction end-to-end test.
+
+After CI succeeds, the separate container workflow builds and scans the server
+and web images with Trivy, then publishes them to GitHub Container Registry:
+
+```text
+ghcr.io/<owner>/<repository>/auction-server:latest
+ghcr.io/<owner>/<repository>/auction-web:latest
+```
 
 ---
 
