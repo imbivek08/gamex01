@@ -14,7 +14,6 @@ RUN npm ci
 COPY server/prisma server/prisma
 COPY server/tsconfig.json server/tsconfig.json
 COPY server/src server/src
-COPY server/test-e2e.ts server/test-e2e.ts
 RUN npm run db:generate --workspace server
 RUN npm run build --workspace server
 
