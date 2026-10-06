@@ -3,11 +3,12 @@
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSocket } from '@/lib/socket'
-import type { AppNotification, RoomSnapshot } from '@/lib/types'
+import type { AppNotification, ChatMessage, RoomSnapshot } from '@/lib/types'
 import Lobby from '@/components/Lobby'
 import AuctionRoom from '@/components/AuctionRoom'
 import Results from '@/components/Results'
 import Toasts, { type Toast } from '@/components/Toasts'
+import ChatPanel from '@/components/ChatPanel'
 
 interface StoredIdentity {
   userId: string
@@ -32,6 +33,7 @@ export default function RoomPage() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [joinError, setJoinError] = useState('')
   const [joining, setJoining] = useState(true)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const snapshotRef = useRef<RoomSnapshot | null>(null)
   snapshotRef.current = snapshot
 
@@ -64,10 +66,12 @@ export default function RoomPage() {
       if (cancelled) return
       pushToast(n)
     }
+    const onChatMessage = (message: ChatMessage) => setChatMessages((previous) => [...previous, message].slice(-100))
 
     const onConnect = () => {
       if (cancelled) return
       setConnected(true)
+      setChatMessages([])
       // (Re-)join the room on every (re)connect so state survives refreshes.
       socket.emit(
         'room:join',
@@ -98,6 +102,7 @@ export default function RoomPage() {
 
     socket.on('room:state', onState)
     socket.on('notification', onNotification)
+    socket.on('chat:message', onChatMessage)
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
 
@@ -107,6 +112,7 @@ export default function RoomPage() {
       cancelled = true
       socket.off('room:state', onState)
       socket.off('notification', onNotification)
+      socket.off('chat:message', onChatMessage)
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
     }
@@ -181,6 +187,10 @@ export default function RoomPage() {
       {snapshot.room.status === 'COMPLETE' && (
         <Results snapshot={snapshot} isHost={isHost} />
       )}
+
+      <div className="mt-4">
+        <ChatPanel messages={chatMessages} participantId={snapshot.you?.participantId} />
+      </div>
 
       <Toasts toasts={toasts} />
     </main>

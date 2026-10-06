@@ -105,3 +105,14 @@ export interface AppNotification {
   type: NotificationType
   message: string
 }
+
+export type ChatMessageKind = 'TEXT' | 'QUICK'
+
+export interface ChatMessage {
+  id: string
+  participantId: string
+  participantName: string
+  text: string
+  kind: ChatMessageKind
+  createdAt: string
+}

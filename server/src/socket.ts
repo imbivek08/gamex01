@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io'
 import { prisma } from './db'
 import { AuctionEngine, AuctionManager, generateRoomCode, MAX_PARTICIPANTS } from './engine'
 import type { RoomSnapshot } from './types'
+import type { ChatMessageKind } from './types'
 
 interface JoinPayload {
   code: string
@@ -253,6 +254,35 @@ export function registerSocketHandlers(io: Server) {
         if (typeof cb === 'function') cb({ ok: true })
       } catch (e) {
         handleError(cb, e instanceof Error ? e.message : 'Bid rejected')
+      }
+    })
+
+    socket.on('chat:send', async (payload: { text?: string; kind?: ChatMessageKind }) => {
+      if (!currentRoomId || !currentParticipantId) {
+        return handleError(null, 'You are not in a room')
+      }
+      const text = (payload.text ?? '').trim()
+      const kind = payload.kind === 'QUICK' ? 'QUICK' : 'TEXT'
+      if (!text || text.length > 240) {
+        return handleError(null, 'Chat messages must be between 1 and 240 characters')
+      }
+      try {
+        const participant = await prisma.participant.findFirst({
+          where: { id: currentParticipantId, roomId: currentRoomId },
+          select: { name: true },
+        })
+        if (!participant) return handleError(null, 'You are not in this room')
+        io.to(currentRoomId).emit('chat:message', {
+          id: crypto.randomUUID(),
+          participantId: currentParticipantId,
+          participantName: participant.name,
+          text,
+          kind,
+          createdAt: new Date().toISOString(),
+        })
+      } catch (e) {
+        console.error('chat:send failed', e)
+        handleError(null, 'Could not send chat message')
       }
     })
 
