@@ -34,4 +34,4 @@ COPY --from=build /app/server/prisma ./server/prisma
 
 EXPOSE 4000
 USER node
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema server/prisma/schema.prisma && node_modules/.bin/tsx server/prisma/seed.ts && node server/dist/index.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema server/prisma/schema.prisma && node server/dist/index.js"]
